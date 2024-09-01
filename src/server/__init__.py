@@ -12,7 +12,7 @@ class Server(Service):
 
     async def run(self):
         info('Start As Server')
-        async with serve(self.bootstrap, "localhost", 8765):
+        async with serve(self.bootstrap, "0.0.0.0", 8765):
             info('Bootstrap has started')
             await asyncio.get_running_loop().create_future()
 
