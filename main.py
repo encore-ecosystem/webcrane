@@ -1,7 +1,7 @@
 from src.server import Server
 from src.client import Client
 from src.shared.modes import Mode
-from src import wsvcs_mode
+from src import MODE, LAST_HOST, LAST_PROJECT_PATH
 
 import asyncio
 
@@ -9,11 +9,11 @@ import asyncio
 async def main():
     service = None
 
-    match wsvcs_mode:
+    match MODE:
         case Mode.SERVER:
             service = Server()
         case Mode.CLIENT:
-            service = Client()
+            service = Client(last_host=LAST_HOST, last_project_path=LAST_PROJECT_PATH)
 
     await service.run()
 
