@@ -1,16 +1,16 @@
-# from src import *
+# from wsvcs import *
 import json
 
 from websockets import WebSocketServerProtocol, ConnectionClosedOK
 
-from src import MODE, HOST, PORT
-from src.shared.abstract import Service
-from src.shared.logging import *
+from wsvcs import MODE, HOST, PORT
+from wsvcs.shared.abstract import Service
+from wsvcs.shared.logging import *
 from websockets.server import serve
 import asyncio
 import pickle
 
-from src.shared.packages import *
+from wsvcs.shared.packages import *
 
 
 class Server(Service):

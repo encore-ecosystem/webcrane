@@ -3,15 +3,15 @@
 #
 from argparse import ArgumentParser
 
-parser = ArgumentParser(
-    prog='wsvcs',
-)
-parser.add_argument('-m', '--mode')
-args = parser.parse_args()
+# parser = ArgumentParser(
+#     prog='wsvcs',
+# )
+# parser.add_argument('-m', '--mode')
+# args = parser.parse_args()
 
 # Resolve mode
-from src.shared.modes import Mode
-mode = args.mode.lower()
+from wsvcs.shared.modes import Mode
+mode = 'server'
 match mode:
     case 'server':
         MODE = Mode.SERVER

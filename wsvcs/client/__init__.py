@@ -1,14 +1,14 @@
 import json
 
 from websockets.sync.client import connect
-from src.shared.abstract import Service
-from src.shared.logging import *
+from wsvcs.shared.abstract import Service
+from wsvcs.shared.logging import *
 from pathlib import Path
-from src.client.walktree import walktree
-from src.shared.packages import *
-from src.shared.hashfile import hash_file
-from src.shared.chunk_reader import read_in_chunks
-from src.client.reverse_dict import reverse_dict
+from wsvcs.client.walktree import walktree
+from wsvcs.shared.packages import *
+from wsvcs.shared.hashfile import hash_file
+from wsvcs.shared.chunk_reader import read_in_chunks
+from wsvcs.client.reverse_dict import reverse_dict
 
 import pickle
 import tqdm

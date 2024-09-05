@@ -6,7 +6,7 @@ authors = ["Encore Ecosystem"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">=3.12,<3.14"
 websockets = "^13.0.1"
 tqdm = "^4.66.5"
 
@@ -14,3 +14,6 @@ tqdm = "^4.66.5"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+wsvcs = "wsvcs.main:main"

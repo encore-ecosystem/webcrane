@@ -1,4 +1,4 @@
-from src.shared.chunk_reader import read_in_chunks
+from wsvcs.shared.chunk_reader import read_in_chunks
 from pathlib import Path
 import hashlib
 
