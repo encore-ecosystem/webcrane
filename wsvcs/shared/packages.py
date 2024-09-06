@@ -1,21 +1,6 @@
-def error_package(error_reason: str):
-    return {
-        'type': 'error',
-        'reason': error_reason
-    }
-
-
 def status_ok():
     return {
         'type': 'ok',
-    }
-
-
-def chunk_package(path: str, data: bytes):
-    return {
-        'type': 'chunk',
-        'path': path,
-        'data': data,
     }
 
 
@@ -72,10 +57,9 @@ def connect_package(room: str):
     }
 
 
-def file_chunk_package(path: str, data: bytes):
+def data_chunk_package(data):
     return {
         'type': 'chunk',
-        'path': path,
         'data': data,
     }
 
