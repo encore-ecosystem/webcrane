@@ -11,4 +11,4 @@ def hash_file(filepath: str):
         for chunk in read_in_chunks(f):
             hasher.update(chunk)
 
-    return hasher.hexdigest()
+    return hasher.hexdigest()[:8]

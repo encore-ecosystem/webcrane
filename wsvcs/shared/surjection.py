@@ -16,6 +16,22 @@ class Surjection:
         except KeyError:
             return default
 
+    def add_dict_as_key2val(self, d: dict):
+        for k, v in d.items():
+            self.key_2_val[k] = v
+            self.val_2_key[v] = k
+
+    def add_dict_as_val2key(self, d: dict):
+        for k, v in d.items():
+            self.key_2_val[v] = k
+            self.val_2_key[k] = v
+
+    def from_keys(self):
+        return self.key_2_val.keys()
+
+    def to_keys(self):
+        return self.val_2_key.keys()
+
     def __len__(self):
         return len(self.key_2_val)
 

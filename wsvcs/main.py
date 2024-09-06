@@ -1,21 +1,28 @@
-from wsvcs.server import Server
-from wsvcs.client import Client
-from wsvcs.shared.modes import Mode
-from wsvcs import MODE, LAST_HOST, LAST_PROJECT_PATH
+from wsvcs.shared.config import parse_config_from_file
+from wsvcs.cli import CLI
 
-import asyncio
+import wsvcs
 
 
-async def cli():
-    match MODE:
-        case Mode.SERVER:
-            await Server().run()
-        case Mode.CLIENT:
-            await Client(last_host=LAST_HOST, last_project_path=LAST_PROJECT_PATH).run()
+def start(mode: str):
+    # Read the config
+    config = parse_config_from_file(wsvcs.CONFIG_PATH)
+
+    # Create CLI
+    cli = CLI(config)
+
+    # Handle arguments
+    if mode in wsvcs.valid_commands:
+        if mode == 'cli':
+            cli.cli()
+        else:
+            cli.__getattribute__(mode)()
+    else:
+        print('Unknown mode, please check manual with <wsvcs --help>')
 
 
 def main():
-    asyncio.run(cli())
+    start(wsvcs.args.mode)
 
 
 if __name__ == '__main__':

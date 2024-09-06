@@ -1,26 +1,24 @@
-# from wsvcs import *
-import json
-
-from websockets import WebSocketServerProtocol, ConnectionClosedOK
-
-from wsvcs import MODE, HOST, PORT
-from wsvcs.shared.abstract import Service
+from websockets import WebSocketServerProtocol
+from configparser import ConfigParser
 from wsvcs.shared.logging import *
 from websockets.server import serve
-import asyncio
-import pickle
-
 from wsvcs.shared.packages import *
 
+import asyncio
+import pickle
+import json
 
-class Server(Service):
+
+class Server:
     def __init__(self):
         self.rooms = {}
 
-    async def run(self):
+    async def run(self, config: ConfigParser):
         info('Start As Server')
-        async with serve(self.bootstrap, HOST, int(PORT)):
-            info('Bootstrap has started')
+        ip   = config['Host']['ip']
+        port = int(config['Host']['port'])
+        async with serve(self.bootstrap, ip, port):
+            print('Bootstrap has started')
             await asyncio.get_running_loop().create_future()
 
     async def bootstrap(self, websocket: WebSocketServerProtocol):
