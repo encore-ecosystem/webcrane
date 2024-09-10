@@ -1,10 +1,9 @@
-from wsvcs.shared.chunk_reader import *
-from wsvcs.shared.tui import input_with_default
-from wsvcs.shared.walktree import walktree
-from wsvcs.shared.hashfile import hash_file
+from wsvcs.utils.chunkify.chunk_reader import *
+from wsvcs.utils.tui import input_with_default
+from wsvcs.utils.filepath.walktree import walktree
+from wsvcs.utils.chunkify.hashfile import hash_file
 from wsvcs.server import Server
-from wsvcs.shared.packages import *
-from wsvcs.shared.surjection import Surjection
+from wsvcs.utils.datastructures.surjection import Surjection
 
 from websockets.sync.client import connect, ClientConnection
 from typing import Optional
@@ -155,12 +154,12 @@ class CLI:
 
     def cli(self):
         while True:
-            command = input("[cli]: ").strip()
+            command = input("[client]: ").strip()
             if command in ('exit', 'q'):
                 return 0
 
             elif command == 'run':
-                print("You are already in cli. The statement does not have any affect.")
+                print("You are already in client. The statement does not have any affect.")
 
             elif command in wsvcs.valid_commands:
                 self.__getattribute__(command)()

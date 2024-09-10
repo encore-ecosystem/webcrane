@@ -1,4 +1,4 @@
-from wsvcs.cli import CLI
+from wsvcs.client import CLI
 
 import wsvcs
 
@@ -9,7 +9,7 @@ def start(mode: str):
 
     # Handle arguments
     if mode in wsvcs.valid_commands:
-        if mode == 'cli':
+        if mode == 'client':
             cli.cli()
         else:
             cli.__getattribute__(mode)()

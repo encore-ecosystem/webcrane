@@ -6,7 +6,7 @@ from pathlib import Path
 CONFIG_PATH = Path() / 'config.ini'
 
 # ====================
-# Parse cli arguments
+# Parse client arguments
 # ====================
 from argparse import ArgumentParser
 
@@ -19,7 +19,7 @@ init   - Initialize current directory as project
 deploy - Use this device as middleware server
 pull   - Create pull request
 push   - Create push request
-cli    - Open Command Line Interface
+client    - Open Command Line Interface
 ''')
 args = parser.parse_args()
 
@@ -27,4 +27,4 @@ args = parser.parse_args()
 # ======================
 # Standard functional
 # ======================
-valid_commands = ['init', 'deploy', 'pull', 'push', 'cli', 'run']
+valid_commands = ['init', 'deploy', 'pull', 'push', 'client', 'run']
