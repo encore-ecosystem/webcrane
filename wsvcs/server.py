@@ -1,6 +1,6 @@
-from wsvcs.utils.chunkify.chunk_reader import split_package_to_chunks
-from wsvcs.utils.tui import input_with_default
-from wsvcs.utils.packages import *
+from wsvcs.src.chunkify.chunk_reader import split_package_to_chunks
+from wsvcs.src.tui import input_with_default
+from wsvcs.src.packages import *
 
 from websockets import WebSocketServerProtocol
 from websockets.server import serve

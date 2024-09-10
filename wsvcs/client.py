@@ -1,10 +1,10 @@
-from wsvcs.utils.chunkify.chunk_reader import *
-from wsvcs.utils.tui import input_with_default
-from wsvcs.utils.filepath.walktree import walktree
-from wsvcs.utils.chunkify.hashfile import hash_file
+from wsvcs.src.chunkify.chunk_reader import *
+from wsvcs.src.tui import input_with_default
+from wsvcs.src.filepath.walktree import walktree
+from wsvcs.src.chunkify.hashfile import hash_file
 from wsvcs.server import Server
-from wsvcs.utils.datastructures.surjection import Surjection
-
+from wsvcs.src.datastructures.surjection import Surjection
+from wsvcs.src.packages import *
 from websockets.sync.client import connect, ClientConnection
 from typing import Optional
 from pathlib import Path
