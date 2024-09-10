@@ -1,15 +1,11 @@
-from wsvcs.shared.config import parse_config_from_file
 from wsvcs.cli import CLI
 
 import wsvcs
 
 
 def start(mode: str):
-    # Read the config
-    config = parse_config_from_file(wsvcs.CONFIG_PATH)
-
     # Create CLI
-    cli = CLI(config)
+    cli = CLI()
 
     # Handle arguments
     if mode in wsvcs.valid_commands:

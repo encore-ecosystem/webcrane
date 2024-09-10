@@ -20,11 +20,13 @@ class Surjection:
         for k, v in d.items():
             self.key_2_val[k] = v
             self.val_2_key[v] = k
+        return self
 
     def add_dict_as_val2key(self, d: dict):
         for k, v in d.items():
             self.key_2_val[v] = k
             self.val_2_key[k] = v
+        return self
 
     def from_keys(self):
         return self.key_2_val.keys()
@@ -37,6 +39,9 @@ class Surjection:
 
     def __contains__(self, item):
         return item in self.key_2_val or item in self.val_2_key
+
+    def __repr__(self):
+        return self.key_2_val.__repr__()
 
 
 __all__ = ["Surjection"]

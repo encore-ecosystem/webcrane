@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 
 
-def walktree(root: Path, black_list: set, shift: int = 0):
+def walktree(root: Path, black_list: set, shift: int = 0) -> list[Path]:
     if root in black_list:
         return []
 
@@ -15,7 +15,7 @@ def walktree(root: Path, black_list: set, shift: int = 0):
         return result
 
     elif root.is_file():
-        return [(root, shift)]
+        return [Path(*root.parts[-shift:])]
 
     else:
         raise TypeError(f"Unexpected file in {root}")

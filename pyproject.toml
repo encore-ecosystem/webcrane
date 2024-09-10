@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "wsvcs"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Encore Ecosystem"]
 readme = "README.md"
@@ -10,6 +10,7 @@ python = ">=3.12,<3.14"
 websockets = "^13.0.1"
 tqdm = "^4.66.5"
 tomli-w = "^1.0.0"
+pytest = "^8.3.2"
 
 
 [build-system]

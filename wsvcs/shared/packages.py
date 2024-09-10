@@ -57,9 +57,10 @@ def connect_package(room: str):
     }
 
 
-def data_chunk_package(data):
+def data_chunk_package(data, path):
     return {
         'type': 'chunk',
+        'path': path,
         'data': data,
     }
 

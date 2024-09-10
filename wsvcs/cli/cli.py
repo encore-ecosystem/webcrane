@@ -1,31 +1,27 @@
 from wsvcs.shared.chunk_reader import *
 from wsvcs.shared.tui import input_with_default
-from wsvcs.api.walktree import walktree
+from wsvcs.shared.walktree import walktree
 from wsvcs.shared.hashfile import hash_file
-from wsvcs.api.server import Server
+from wsvcs.server import Server
 from wsvcs.shared.packages import *
+from wsvcs.shared.surjection import Surjection
 
 from websockets.sync.client import connect, ClientConnection
-from configparser import ConfigParser
 from typing import Optional
 from pathlib import Path
 
-from wsvcs.shared.surjection import Surjection
-
+from pickle import loads, dumps
 import asyncio
 import tomllib
 import tomli_w
-import pickle
 import wsvcs
 import tqdm
-import json
 import sys
 import re
 
 
 class CLI:
-    def __init__(self, config: ConfigParser):
-        self.config = config
+    def __init__(self):
         self.project_root = Path().absolute()
 
     def init(self):
@@ -43,9 +39,10 @@ class CLI:
         manifest = self.get_manifest()
 
         manifest['project'] = {
-            'authors': input_with_default('Enter authors separated by comma', 'unknown').split(','),
-            'licence': input_with_default('Licence', 'MIT'),
-            'server': input("Enter server host: ").strip(),
+            'name'    : input_with_default('Enter project name', default=self.project_root.name),
+            'authors' : input_with_default('Enter authors separated by comma', 'unknown').split(','),
+            'licence' : input_with_default('Licence', 'MIT'),
+            'server'  : input("Enter server host: ").strip(),
         }
 
         # Save manifest
@@ -54,114 +51,103 @@ class CLI:
 
         print("Ready!")
 
-    def deploy(self):
+    @staticmethod
+    def deploy():
         server = Server()
-        asyncio.run(server.run(self.config))
+        asyncio.run(server.run())
 
     def push(self):
         manifest = self.get_manifest()
-        project_path = self.wsvcs_path.parent
-        host = f"ws://{manifest['server']}"
-        with connect(host) as websocket:
-            websocket.send(json.dumps(role_package('pub')))
-            websocket.send(json.dumps(room_package(input("Enter room name: "))))
+        with connect(f"ws://{manifest['project']['server']}") as websocket:
+            print("Sending pub request")
+            websocket.send('pub')
 
-            # Update process
+            print("Sending room name")
+            websocket.send(dumps(room_package(self.project_root.name)))
+
+            print("Enter to console")
             while True:
                 command = input(": ")
                 if re.fullmatch('subs', command):
-                    websocket.send(json.dumps(refresh_package()))
-                    print(f'Subscribers: {json.loads(websocket.recv())['subs']}')
+                    websocket.send(dumps(refresh_package()))
+                    print(f'Subscribers: {loads(websocket.recv())['subs']}')
 
                 elif re.fullmatch('sync', command):
-                    websocket.send(json.dumps(sync_package()))
+                    websocket.send(dumps(sync_package()))
                     break
 
                 else:
                     print('Invalid command')
 
-            # Sync process
-            black_list = set()
-            files_path = walktree(project_path, black_list)
-            hashes = {self.convert_to_project_path(filepath): hash_file(filepath[0]) for filepath in files_path}
+            print("Hashing packages")
+            hashes_packages = dumps(
+                {
+                    str(path): hash_file(self.project_root / path)
+                    for path in tqdm.tqdm(walktree(self.project_root, black_list=self.get_blacklist()))
+                }
+            )
 
-            websocket.send(json.dumps(hashes))
+            print("Sending path2hash package")
+            self.send_chunked_package(
+                websocket,
+                split_package_to_chunks(hashes_packages)
+            )
 
-            # Read
-            packages = json.loads(websocket.recv())['packages']
-            for filepath in tqdm.tqdm(packages):
-                with open(project_path / filepath, 'rb') as f:
-                    self.send_chunked_package(websocket, read_in_chunks(f, chunk_size=1024))
-            websocket.send(pickle.dumps(complete()))
+            print("Receiving missed files request")
+            requested_packages = self.receive_chunked_package(websocket)['packages']
+
+            print("Sending files as chunks")
+            for filepath in tqdm.tqdm(requested_packages):
+                with open(self.project_root / filepath, 'rb') as f:
+                    self.send_chunked_package(
+                        websocket,
+                        read_in_chunks(
+                            f,
+                            path       = filepath
+                        )
+                    )
 
     def pull(self):
         manifest = self.get_manifest()
-        project_path = self.wsvcs_path.parent
-        host = f"ws://{manifest['server']}"
-        with connect(host) as websocket:
-            websocket.send(json.dumps(role_package('sub')))
-            # Update process
-            while True:
-                command = input("Enter command: ")
-                if re.fullmatch('refresh', command):
-                    websocket.send(json.dumps(refresh_package()))
-                    print(f'Rooms: {json.loads(websocket.recv())['rooms']}')
+        with connect(f"ws://{manifest['project']['server']}") as websocket:
+            print('Sending pull request')
+            websocket.send('sub')
 
-                elif re.fullmatch('connect', command.split()[0]):
-                    websocket.send(json.dumps(connect_package(command.split()[1])))
-                    break
-
-                else:
-                    print('Invalid command')
-
-            # Sync process
-            print("Waiting for source files...")
-            path_and_hash = Surjection()
-            path_and_hash.add_dict_as_key2val(json.loads(websocket.recv()))
-            black_list = self.get_blacklist()
-
-            files_to_update = set()
-            files_to_delete = set()  # todo
-            files_to_move = set()  # todo
-            files_to_save = set()
-
-            for filepath in walktree(project_path, black_list):  # todo: move walktree and self.convert_to... to module
-                filepath_short = self.convert_to_project_path(filepath)
-                file_hash = hash_file(filepath[0])
-                # case 1: files at the same directory
-                if filepath_short in path_and_hash:
-                    if path_and_hash[filepath_short] != file_hash:
-                        # update
-                        files_to_update.add(filepath_short)
-                    else:
-                        # same file
-                        files_to_save.add(filepath_short)
-
-                # case 2: same files at the difference folders
-                elif file_hash in path_and_hash:
-                    # move
-                    files_to_move.add((filepath_short, path_and_hash[file_hash]))
-
-                # case 3: waste file
-                else:
-                    # waste
-                    files_to_delete.add(filepath_short)
-
-            # case 4: new files
-            new_files = set(path_and_hash.from_keys()).difference(files_to_save)
-
-            # send missed packages request
-            self.send_chunked_package(
-                websocket,
-                split_string_to_chunks(
-                    string=json.dumps(missed_package(list(new_files | files_to_update))),
-                    chunk_size=1024
+            print('Sending project name')
+            websocket.send(
+                dumps(
+                    connect_package(
+                        room=manifest['project']['name']
+                    )
                 )
             )
 
-            # receive missed packages
-            for package in self.receive_chunked_package(websocket):
-                full_path = project_path / package['path']
+            print("Waiting for path and hash surjection")
+            path_and_hash = Surjection().add_dict_as_key2val(
+                self.receive_chunked_package(websocket)
+            )
+
+            print("Grouping files")
+            files_to_update, files_to_delete, files_to_move, new_files = self.group_files(path_and_hash)
+
+            print("Deleting files")
+            self.delete_files(files_to_delete)
+
+            print("Moving files")
+            self.move_files(files_to_move)
+
+            print("Sending missed files request")
+            self.send_chunked_package(
+                websocket,
+                split_package_to_chunks(
+                    dumps(missed_package(list(new_files | files_to_update))),
+                )
+            )
+
+            print("Receive missed files chunks")
+
+            for package in self.receive_chunked_package_as_chunks(websocket):
+                full_path = self.project_root / package['path']
                 full_path.parent.mkdir(parents=True, exist_ok=True)
                 full_path.touch(exist_ok=True)
                 with open(full_path, 'ab+') as f:
@@ -187,11 +173,13 @@ class CLI:
             with open(self.manifest_file, "rb") as f:
                 manifest = tomllib.load(f)
             return manifest
-        return None
+
+        print("You should initialize project first")
+        exit(-1)
 
     @staticmethod
     def get_blacklist():
-        return set()
+        return set()  # todo
 
     @property
     def wsvcs_path(self):
@@ -206,27 +194,81 @@ class CLI:
         return self.wsvcs_path / 'manifest.toml'
 
     @staticmethod
-    def convert_to_project_path(filepath: tuple[Path, int]):
-        return Path(*filepath[0].parts[-filepath[1]:]).__str__()
-
-    @staticmethod
     def send_chunked_package(websocket: ClientConnection, chunk_generator):
-        for chunk in chunk_generator:
+        for chunk, path in chunk_generator:
             websocket.send(
-                pickle.dumps(
-                    data_chunk_package(chunk)
+                dumps(
+                    data_chunk_package(chunk, path)
                 )
             )
-        websocket.send(complete())
+        websocket.send(dumps(complete()))
 
     @staticmethod
-    def receive_chunked_package(websocket: ClientConnection):
+    def receive_chunked_package_as_chunks(websocket: ClientConnection):
         while True:
-            package = pickle.loads(websocket.recv())
+            package = loads(websocket.recv())
             if package['type'] == 'complete':
                 break
             elif package['type'] == 'chunk':
                 yield package
+
+    @staticmethod
+    def receive_chunked_package(websocket: ClientConnection):
+        full_package = b''
+        while True:
+            package = loads(websocket.recv())
+            if package['type'] == 'complete':
+                break
+            elif package['type'] == 'chunk':
+                full_package += package['data']
+        return loads(full_package)
+
+    def group_files(self, path_hash_sur: Surjection) -> tuple[set, set, set, set]:
+        files_to_update = set()
+        files_to_delete = set()
+        files_to_move   = set()
+        files_to_save   = set()
+
+        for short_path in walktree(self.project_root, self.get_blacklist()):
+            short_path = str(short_path)
+            long_path = self.project_root / short_path
+            file_hash = hash_file(long_path)
+            # case 1: files at the same directory
+            if short_path in path_hash_sur:
+                if path_hash_sur[short_path] == file_hash:
+                    # same file
+                    files_to_save.add(short_path)
+                else:
+                    # update
+                    print(f"[U] {short_path}")
+                    files_to_update.add(short_path)
+
+            # case 2: same files at the difference folders
+            elif file_hash in path_hash_sur:
+                # move                 <from>         <to>
+                files_to_move.add((short_path, path_hash_sur[file_hash]))
+                print(f"[M] {short_path} -> {path_hash_sur[file_hash]}")
+
+            # case 3: waste file
+            else:
+                # waste
+                files_to_delete.add(short_path)
+                print(f"[D] {short_path}")
+
+        # case 4: new files
+        new_files = set(path_hash_sur.from_keys()).difference(files_to_save)
+
+        return files_to_update, files_to_delete, files_to_move, new_files
+
+    def delete_files(self, files_to_delete: set[Path]):
+        for file in files_to_delete:
+            full_path = self.project_root / file
+            print(f'...[ Removing file {full_path} ]...')
+
+    def move_files(self, files_to_move: set[Path]):
+        for file in files_to_move:
+            full_path = self.project_root / file
+            print(f'...[ Moving file {full_path} ]...')
 
 
 __all__ = [
