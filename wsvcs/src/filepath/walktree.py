@@ -11,16 +11,21 @@ def walktree(root: Path, dot_ignore: DotIgnore, shift: int = 0) -> list[Path]:
         result = []
         for path in os.listdir(root):
             path = root / path
-            if dot_ignore.is_ignored(path):
+            path_rel_to_proj = make_path_shorter(path, shift + 1)
+            if dot_ignore.is_ignored(path_rel_to_proj):
                 continue
             result += walktree(path, dot_ignore, shift + 1)
         return result
 
     elif root.is_file():
-        return [Path(*root.parts[-shift:])]
+        return [make_path_shorter(root, shift)]
 
     else:
         raise TypeError(f"Unexpected file in {root}")
+
+
+def make_path_shorter(root: Path, shift: int = 0) -> Path:
+    return Path(*root.parts[-shift:])
 
 
 __all__ = [

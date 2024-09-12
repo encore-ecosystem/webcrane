@@ -5,34 +5,31 @@ from pathlib import Path
 
 def get_default_manifest(project_root: Path) -> Manifest:
     manifest = Manifest()
-
-    manifest['project'] = {
+    manifest.manifest = {'project': {
         'name': input_with_default(
-            prompt  = 'Enter project name',
-            default = project_root.name,
+            prompt='Enter project name',
+            default=project_root.name,
         ),
 
         'authors': input_with_default(
-            prompt  = 'Enter authors separated by comma',
-            default = 'unknown',
+            prompt='Enter authors separated by comma',
+            default='unknown',
         ).split(','),
 
         'licence': input_with_default(
-            prompt  = 'Licence',
-            default = 'MIT',
+            prompt='Licence',
+            default='MIT',
         ),
 
         'ignore': [
             'wsvcs/.wsvcsignore',
         ]
-    }
-
-    manifest['sync'] = {
+    }, 'sync': {
         'server': input_with_default(
-            prompt  = 'Server Host',
-            default = 'localhost:8765'
+            prompt='Server Host',
+            default='localhost:8765'
         ),
-    }
+    }}
 
     return manifest
 

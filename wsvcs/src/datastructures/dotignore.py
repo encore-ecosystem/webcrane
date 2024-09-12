@@ -13,7 +13,7 @@ class DotIgnore:
                     # step 1: remove comments
                     pattern = line.split('#')[0].strip()
                     # step 2: add to ignore paths
-                    self.add(pattern)
+                    self.patterns.add(pattern)
 
         return self
 

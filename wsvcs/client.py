@@ -45,13 +45,13 @@ class CLI:
 
     def get_dotignore(self):
         return DotIgnore().initialize(
-            self.get_manifest()['project']['ignore']
+            [self.project_root / x for x in self.get_manifest()['project']['ignore']]
         ).optimize()
 
     def push(self):
         mfest = self.get_manifest()
 
-        with connect(f"ws://{mfest['project']['server']}") as websocket:
+        with connect(f"ws://{mfest['sync']['server']}") as websocket:
             print("Sending pub request")
             websocket.send('pub')
 
@@ -79,7 +79,7 @@ class CLI:
                     for path in tqdm.tqdm(
                         walktree(
                             self.project_root,
-                            dot_ignore=self.get_dotignore()
+                            self.get_dotignore()
                         )
                     )
                 }
@@ -107,7 +107,7 @@ class CLI:
 
     def pull(self):
         mfest = self.get_manifest()
-        with connect(f"ws://{mfest['project']['server']}") as websocket:
+        with connect(f"ws://{mfest['sync']['server']}") as websocket:
             print('Sending pull request')
             websocket.send('sub')
 
@@ -254,7 +254,9 @@ class CLI:
             print(f'...[ Moving file {full_path} ]...')
 
     def get_manifest(self):
-        return Manifest().read_manifest(self.manifest_file)
+        mfest = Manifest()
+        mfest.read_manifest(self.manifest_file)
+        return mfest
 
 
 __all__ = [
