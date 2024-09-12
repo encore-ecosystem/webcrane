@@ -7,7 +7,7 @@ from wsvcs.src.manifest import *
 from websockets.sync.client import connect, ClientConnection
 from pathlib import Path
 from wsvcs.src.datastructures import *
-
+from wsvcs import PACKAGE_MAX_SIZE
 
 from pickle import loads, dumps
 import asyncio
@@ -95,15 +95,39 @@ class CLI:
             requested_packages = self.receive_chunked_package(websocket)['packages']
 
             print("Sending files as chunks")
+            cache = []
+            cache_size = 0
             for filepath in tqdm.tqdm(requested_packages):
+                file_size = (self.project_root / filepath).stat().st_size
                 with open(self.project_root / filepath, 'rb') as f:
-                    self.send_chunked_package(
-                        websocket,
-                        read_in_chunks(
-                            f,
-                            path = filepath
+                    if file_size > PACKAGE_MAX_SIZE:
+                        self.send_chunked_package(
+                            websocket,
+                            read_in_chunks(
+                                f,
+                                path=filepath
+                            )
                         )
-                    )
+                    else:
+                        # There is size in cache for this file
+                        if PACKAGE_MAX_SIZE - cache_size >= file_size:
+                            cache.append(data_chunk_package(f.read(), path=filepath))
+                            cache_size += file_size
+
+                        # There is no size in cache for this file
+                        else:
+                            # Send cumulative cache
+                            if cache:
+                                websocket.send(dumps(full_data_package(cache)))
+
+                            # update cache
+                            cache = [data_chunk_package(f.read(), path=filepath)]
+                            cache_size = file_size
+            if cache:
+                websocket.send(dumps(full_data_package(cache)))
+
+            print("Sending close request")
+            websocket.send(dumps(close_package()))
 
     def pull(self):
         mfest = self.get_manifest()
@@ -140,14 +164,18 @@ class CLI:
                 )
             )
 
-            print("Receive missed files chunks")
-
+            print("Receive chunks with missed files")
             for package in self.receive_chunked_package_as_chunks(websocket):
-                full_path = self.project_root / package['path']
-                full_path.parent.mkdir(parents=True, exist_ok=True)
-                full_path.touch(exist_ok=True)
-                with open(full_path, 'ab+') as f:
-                    f.write(package['data'])
+                if package['type'] == 'full':
+                    extracted_packages = package['data']
+                else:
+                    extracted_packages = [package]
+                for pck in extracted_packages:
+                    full_path = self.project_root / pck['path']
+                    full_path.parent.mkdir(parents=True, exist_ok=True)
+                    full_path.touch(exist_ok=True)
+                    with open(full_path, 'ab+') as f:
+                        f.write(pck['data'])
 
     def cli(self):
         while True:
@@ -192,7 +220,7 @@ class CLI:
             package = loads(websocket.recv())
             if package['type'] == 'complete':
                 break
-            elif package['type'] == 'chunk':
+            elif package['type'] in ('chunk', 'full'):
                 yield package
 
     @staticmethod

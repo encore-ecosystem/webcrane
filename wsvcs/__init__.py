@@ -21,3 +21,10 @@ args = parser.parse_args()
 # Standard functional
 # ======================
 valid_commands = ['init', 'deploy', 'pull', 'push', 'client', 'run']
+
+# ======================
+# Package Max Size
+# ======================
+
+#                   mb   bytes
+PACKAGE_MAX_SIZE = 512 * 1024

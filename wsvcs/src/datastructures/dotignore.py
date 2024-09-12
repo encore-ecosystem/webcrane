@@ -4,7 +4,7 @@ from globmatch import glob_match
 
 class DotIgnore:
     def __init__(self):
-        self.patterns: set[str] = set()
+        self.patterns = {".wsvcs/*"}
 
     def initialize(self, ignore_file_paths: list[Path]) -> 'DotIgnore':
         for ignore_file_path in ignore_file_paths:

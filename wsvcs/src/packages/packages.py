@@ -65,8 +65,21 @@ def data_chunk_package(data, path):
     }
 
 
+def full_data_package(data):
+    return {
+        'type': 'full',
+        'data': data,
+    }
+
+
 def missed_package(packages: list):
     return {
         'type': 'to_download',
         'packages': packages
+    }
+
+
+def close_package():
+    return {
+        'type': 'close'
     }
