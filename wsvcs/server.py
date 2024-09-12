@@ -28,6 +28,15 @@ class Server:
         if role == 'sub':
             print("[SUB]: Receiving project name")
             project_name = loads(await websocket.recv())['room']
+
+            try:
+                async with asyncio.timeout(60):
+                    while project_name not in self.rooms:
+                        await asyncio.sleep(0.5)
+            except asyncio.TimeoutError:
+                await websocket.close(reason="Publisher not create a room during 60 seconds")
+                return
+
             self.rooms[project_name]['subscribers'].append(websocket)
 
             print("[SUB]: Receiving missing packages")
@@ -78,7 +87,7 @@ class Server:
             while self.rooms[project_name]['status'] != len(self.rooms[project_name]['subscribers']):
                 await asyncio.sleep(0.01)
 
-            print("[PUB]: Transmit chunks")
+            print("[PUB]: Transmit missed files")
             await self.send_chunked_package(
                 websocket,
                 split_package_to_chunks(
@@ -86,17 +95,20 @@ class Server:
                 )
             )
 
-            for _ in range(len(self.rooms[project_name]['files'])):
-                while True:
-                    package = loads(await websocket.recv())
-                    if package['type'] == 'complete':
-                        break
-                    elif package['type'] == 'chunk':
-                        package = dumps(package)
-                        await asyncio.gather(*[sub.send(package) for sub in self.rooms[project_name]['subscribers']])
+            print("[PUB]: Transmit chunks")
+            while True:
+                package = loads(await websocket.recv())
+                if package['type'] == 'complete':
+                    continue
+                elif package['type'] == 'close':
+                    break
+                elif package['type'] in ('chunk', 'full'):
+                    package = dumps(package)
+                    await asyncio.gather(*[sub.send(package) for sub in self.rooms[project_name]['subscribers']])
 
             await asyncio.gather(*[sub.send(dumps(complete())) for sub in self.rooms[project_name]['subscribers']])
             del self.rooms[project_name]
+            print("Successful")
 
         else:
             pass
@@ -108,7 +120,7 @@ class Server:
             package = loads(await websocket.recv())
             if package['type'] == 'complete':
                 break
-            elif package['type'] == 'chunk':
+            elif package['type'] in ('chunk', 'full'):
                 full_package += package['data']
         return loads(full_package)
 
