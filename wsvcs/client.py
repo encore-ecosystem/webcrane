@@ -11,10 +11,12 @@ from wsvcs import PACKAGE_MAX_SIZE
 
 from pickle import loads, dumps
 import asyncio
+import shutil
 import wsvcs
 import tqdm
 import sys
 import re
+import os
 
 
 class CLI:
@@ -258,13 +260,11 @@ class CLI:
             elif file_hash in path_hash_sur:
                 # move                 <from>         <to>
                 files_to_move.add((short_path, path_hash_sur[file_hash]))
-                print(f"[M] {short_path} -> {path_hash_sur[file_hash]}")
 
             # case 3: waste file
             else:
                 # waste
                 files_to_delete.add(short_path)
-                print(f"[D] {short_path}")
 
         # case 4: new files
         new_files = set(path_hash_sur.from_keys()).difference(files_to_save)
@@ -274,12 +274,32 @@ class CLI:
     def delete_files(self, files_to_delete: set[Path]):
         for file in files_to_delete:
             full_path = self.project_root / file
-            print(f'...[ Removing file {full_path} ]...')
+            if full_path.exists() and full_path.is_file():
+                print(f"[D] {full_path}")
+                os.remove(full_path)
 
-    def move_files(self, files_to_move: set[Path]):
-        for file in files_to_move:
-            full_path = self.project_root / file
-            print(f'...[ Moving file {full_path} ]...')
+            parent = full_path.parent
+            while parent != self.project_root and len(os.listdir(parent)) == 0:
+                print(f"[D] deleting empty folder: {parent}")
+                shutil.rmtree(parent)
+                parent = parent.parent
+
+    def move_files(self, files_to_move: set[tuple[Path, Path]]):
+        while len(files_to_move) > 0:
+            src, dst = files_to_move.pop()
+            print(f"[M] {src} -> {dst}")
+
+            src = self.project_root / src
+            dst = self.project_root / dst
+
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(src, dst)
+
+            parent = src.parent
+            while parent != self.project_root and len(os.listdir(parent)) == 0:
+                print(f"[M] deleting empty folder: {parent}")
+                shutil.rmtree(parent)
+                parent = parent.parent
 
     def get_manifest(self):
         mfest = Manifest()
