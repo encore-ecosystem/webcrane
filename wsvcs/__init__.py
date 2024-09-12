@@ -1,10 +1,3 @@
-# =================
-# Read Config File
-# =================
-from pathlib import Path
-
-CONFIG_PATH = Path() / 'config.ini'
-
 # ====================
 # Parse client arguments
 # ====================

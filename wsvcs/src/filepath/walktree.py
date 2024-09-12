@@ -1,17 +1,19 @@
+from wsvcs.src.datastructures import DotIgnore
 from pathlib import Path
 import os
 
 
-def walktree(root: Path, black_list: set, shift: int = 0) -> list[Path]:
-    if root in black_list:
+def walktree(root: Path, dot_ignore: DotIgnore, shift: int = 0) -> list[Path]:
+    if dot_ignore.is_ignored(root):
         return []
 
     if root.is_dir():
         result = []
         for path in os.listdir(root):
-            if path in black_list:
+            path = root / path
+            if dot_ignore.is_ignored(path):
                 continue
-            result += walktree(root / path, black_list, shift + 1)
+            result += walktree(path, dot_ignore, shift + 1)
         return result
 
     elif root.is_file():
