@@ -10,7 +10,7 @@ python = ">=3.12,<3.14"
 websockets = "^13.0.1"
 tqdm = "^4.66.5"
 tomli-w = "^1.0.0"
-pytest = "^8.3.2"
+globmatch = "^2.0.0"
 
 
 [build-system]

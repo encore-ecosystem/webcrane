@@ -1,19 +1,16 @@
-from wsvcs.shared.chunk_reader import *
-from wsvcs.shared.tui import input_with_default
-from wsvcs.shared.walktree import walktree
-from wsvcs.shared.hashfile import hash_file
+from wsvcs.src.chunkify.chunk_reader import *
+from wsvcs.src.filepath.walktree import walktree
+from wsvcs.src.chunkify.hashfile import hash_file
 from wsvcs.server import Server
-from wsvcs.shared.packages import *
-from wsvcs.shared.surjection import Surjection
-
+from wsvcs.src.packages import *
+from wsvcs.src.manifest import *
 from websockets.sync.client import connect, ClientConnection
-from typing import Optional
 from pathlib import Path
+from wsvcs.src.datastructures import *
+
 
 from pickle import loads, dumps
 import asyncio
-import tomllib
-import tomli_w
 import wsvcs
 import tqdm
 import sys
@@ -30,25 +27,15 @@ class CLI:
             sys.stderr.write("error: WSVCS path exists\n")
             return
 
-        # Create wsvcs folder
+        # Create wsvcs environment
         self.wsvcs_path.mkdir()
         self.ignore_file.touch()
         self.manifest_file.touch()
 
-        # Fill manifest
-        manifest = self.get_manifest()
+        # Save default manifest
+        get_default_manifest(self.project_root).save(self.manifest_file)
 
-        manifest['project'] = {
-            'name'    : input_with_default('Enter project name', default=self.project_root.name),
-            'authors' : input_with_default('Enter authors separated by comma', 'unknown').split(','),
-            'licence' : input_with_default('Licence', 'MIT'),
-            'server'  : input("Enter server host: ").strip(),
-        }
-
-        # Save manifest
-        with open(self.manifest_file, "wb") as f:
-            tomli_w.dump(manifest, f)
-
+        # Complete
         print("Ready!")
 
     @staticmethod
@@ -56,9 +43,15 @@ class CLI:
         server = Server()
         asyncio.run(server.run())
 
+    def get_dotignore(self):
+        return DotIgnore().initialize(
+            [self.project_root / x for x in self.get_manifest()['project']['ignore']]
+        ).optimize()
+
     def push(self):
-        manifest = self.get_manifest()
-        with connect(f"ws://{manifest['project']['server']}") as websocket:
+        mfest = self.get_manifest()
+
+        with connect(f"ws://{mfest['sync']['server']}") as websocket:
             print("Sending pub request")
             websocket.send('pub')
 
@@ -83,7 +76,12 @@ class CLI:
             hashes_packages = dumps(
                 {
                     str(path): hash_file(self.project_root / path)
-                    for path in tqdm.tqdm(walktree(self.project_root, black_list=self.get_blacklist()))
+                    for path in tqdm.tqdm(
+                        walktree(
+                            self.project_root,
+                            self.get_dotignore()
+                        )
+                    )
                 }
             )
 
@@ -103,22 +101,20 @@ class CLI:
                         websocket,
                         read_in_chunks(
                             f,
-                            path       = filepath
+                            path = filepath
                         )
                     )
 
     def pull(self):
-        manifest = self.get_manifest()
-        with connect(f"ws://{manifest['project']['server']}") as websocket:
+        mfest = self.get_manifest()
+        with connect(f"ws://{mfest['sync']['server']}") as websocket:
             print('Sending pull request')
             websocket.send('sub')
 
             print('Sending project name')
             websocket.send(
                 dumps(
-                    connect_package(
-                        room=manifest['project']['name']
-                    )
+                    connect_package(mfest['project']['name'])
                 )
             )
 
@@ -155,31 +151,18 @@ class CLI:
 
     def cli(self):
         while True:
-            command = input("[cli]: ").strip()
+            command = input("[client]: ").strip()
             if command in ('exit', 'q'):
                 return 0
 
             elif command == 'run':
-                print("You are already in cli. The statement does not have any affect.")
+                print("You are already in client. The statement does not have any affect.")
 
             elif command in wsvcs.valid_commands:
                 self.__getattribute__(command)()
 
             else:
                 print("Invalid command.")
-
-    def get_manifest(self) -> Optional[dict]:
-        if self.manifest_file.exists():
-            with open(self.manifest_file, "rb") as f:
-                manifest = tomllib.load(f)
-            return manifest
-
-        print("You should initialize project first")
-        exit(-1)
-
-    @staticmethod
-    def get_blacklist():
-        return set()  # todo
 
     @property
     def wsvcs_path(self):
@@ -229,7 +212,7 @@ class CLI:
         files_to_move   = set()
         files_to_save   = set()
 
-        for short_path in walktree(self.project_root, self.get_blacklist()):
+        for short_path in walktree(self.project_root, dot_ignore=self.get_dotignore()):
             short_path = str(short_path)
             long_path = self.project_root / short_path
             file_hash = hash_file(long_path)
@@ -269,6 +252,11 @@ class CLI:
         for file in files_to_move:
             full_path = self.project_root / file
             print(f'...[ Moving file {full_path} ]...')
+
+    def get_manifest(self):
+        mfest = Manifest()
+        mfest.read_manifest(self.manifest_file)
+        return mfest
 
 
 __all__ = [
