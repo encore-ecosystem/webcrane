@@ -154,6 +154,7 @@ class CLI:
 
             print("Deleting files")
             self.delete_files(files_to_delete)
+            self.delete_files(files_to_update)
 
             print("Moving files")
             self.move_files(files_to_move)
