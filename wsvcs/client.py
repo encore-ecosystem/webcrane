@@ -1,6 +1,8 @@
+import websockets
+
 from wsvcs.src.chunkify.chunk_reader import *
-from wsvcs.src.filepath.walktree import walktree
-from wsvcs.src.chunkify.hashfile import hash_file
+from wsvcs.src.filepath.walktree import *
+from wsvcs.src.chunkify.hashfile import *
 from wsvcs.server import Server
 from wsvcs.src.packages import *
 from wsvcs.src.manifest import *
@@ -8,8 +10,10 @@ from websockets.sync.client import connect, ClientConnection
 from pathlib import Path
 from wsvcs.src.datastructures import *
 from wsvcs import PACKAGE_MAX_SIZE
-
 from pickle import loads, dumps
+from termcolor import colored
+
+import concurrent.futures
 import asyncio
 import shutil
 import wsvcs
@@ -53,6 +57,7 @@ class CLI:
     def push(self):
         mfest = self.get_manifest()
 
+        print(f"Server is {mfest['sync']['server']}")
         with connect(f"ws://{mfest['sync']['server']}") as websocket:
             print("Sending pub request")
             websocket.send('pub')
@@ -74,18 +79,15 @@ class CLI:
                 else:
                     print('Invalid command')
 
-            print("Hashing packages")
-            hashes_packages = dumps(
-                {
-                    str(path): hash_file(self.project_root / path)
-                    for path in tqdm.tqdm(
-                        walktree(
-                            self.project_root,
-                            self.get_dotignore()
-                        )
-                    )
-                }
-            )
+            print(f"Hashing packages ({wsvcs.HASHING_THREADS}) threads")
+            hashes_packages = {}
+            file_paths = list(walktree(self.project_root, self.get_dotignore()))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=wsvcs.HASHING_THREADS) as executor:
+                future_to_path = {executor.submit(process_file, self.project_root, path): path for path in file_paths}
+                for future in tqdm.tqdm(concurrent.futures.as_completed(future_to_path), total=len(file_paths)):
+                    path, file_hash = future.result()
+                    hashes_packages[path] = file_hash
+            hashes_packages = dumps(hashes_packages)
 
             print("Sending path2hash package")
             self.send_chunked_package(
@@ -99,7 +101,20 @@ class CLI:
             print("Sending files as chunks")
             cache = []
             cache_size = 0
-            for filepath in tqdm.tqdm(requested_packages):
+
+            pbar = tqdm.tqdm(requested_packages)
+            for filepath in pbar:
+                # progress bar description
+                if len(filepath) <= wsvcs.LENGTH_OF_PATH_IN_PBAR:
+                    desc = filepath
+                else:
+                    desc = '...'+filepath[-wsvcs.LENGTH_OF_PATH_IN_PBAR + 3:]
+
+                pbar.set_description_str(
+                    desc="Working on: " + colored(f"{desc:>{wsvcs.LENGTH_OF_PATH_IN_PBAR}}", "cyan")
+                )
+
+                # logic
                 file_size = (self.project_root / filepath).stat().st_size
                 with open(self.project_root / filepath, 'rb') as f:
                     if file_size > PACKAGE_MAX_SIZE:
@@ -133,6 +148,7 @@ class CLI:
 
     def pull(self):
         mfest = self.get_manifest()
+        print(f"Server is {mfest['sync']['server']}")
         with connect(f"ws://{mfest['sync']['server']}") as websocket:
             print('Sending pull request')
             websocket.send('sub')
@@ -143,42 +159,46 @@ class CLI:
                     connect_package(mfest['project']['name'])
                 )
             )
-
-            print("Waiting for path and hash surjection")
-            path_and_hash = Surjection().add_dict_as_key2val(
-                self.receive_chunked_package(websocket)
-            )
-
-            print("Grouping files")
-            files_to_update, files_to_delete, files_to_move, new_files = self.group_files(path_and_hash)
-
-            print("Deleting files")
-            self.delete_files(files_to_delete)
-            self.delete_files(files_to_update)
-
-            print("Moving files")
-            self.move_files(files_to_move)
-
-            print("Sending missed files request")
-            self.send_chunked_package(
-                websocket,
-                split_package_to_chunks(
-                    dumps(missed_package(list(new_files | files_to_update))),
+            try:
+                print("Waiting for path and hash surjection")
+                path_and_hash = Surjection().add_dict_as_key2val(
+                    self.receive_chunked_package(websocket)
                 )
-            )
 
-            print("Receive chunks with missed files")
-            for package in self.receive_chunked_package_as_chunks(websocket):
-                if package['type'] == 'full':
-                    extracted_packages = package['data']
-                else:
-                    extracted_packages = [package]
-                for pck in extracted_packages:
-                    full_path = self.project_root / pck['path']
-                    full_path.parent.mkdir(parents=True, exist_ok=True)
-                    full_path.touch(exist_ok=True)
-                    with open(full_path, 'ab+') as f:
-                        f.write(pck['data'])
+                print("Grouping files")
+                files_to_update, files_to_delete, files_to_move, new_files = self.group_files(path_and_hash)
+
+                print("Deleting files")
+                self.delete_files(files_to_delete)
+                self.delete_files(files_to_update)
+
+                print("Moving files")
+                self.move_files(files_to_move)
+
+                print("Sending missed files request")
+                self.send_chunked_package(
+                    websocket,
+                    split_package_to_chunks(
+                        dumps(missed_package(list(new_files | files_to_update))),
+                    )
+                )
+
+                print("Receive chunks with missed files")
+                for package in self.receive_chunked_package_as_chunks(websocket):
+                    if package['type'] == 'full':
+                        extracted_packages = package['data']
+                    else:
+                        extracted_packages = [package]
+                    for pck in extracted_packages:
+                        full_path = self.project_root / pck['path']
+                        full_path.parent.mkdir(parents=True, exist_ok=True)
+                        full_path.touch(exist_ok=True)
+                        with open(full_path, 'ab+') as f:
+                            f.write(pck['data'])
+                        print(f"Accepted data for: {colored(pck['path'], "cyan")}")
+
+            except websockets.ConnectionClosedOK:
+                print("Connection closed. Project don't synchronize")
 
     def cli(self):
         while True:
@@ -254,7 +274,7 @@ class CLI:
                     files_to_save.add(short_path)
                 else:
                     # update
-                    print(f"[U] {short_path}")
+                    print(f"{colored("[U]", "magenta")}: {short_path}")
                     files_to_update.add(short_path)
 
             # case 2: same files at the difference folders
@@ -276,19 +296,19 @@ class CLI:
         for file in files_to_delete:
             full_path = self.project_root / file
             if full_path.exists() and full_path.is_file():
-                print(f"[D] {full_path}")
+                print(f"{colored("[D]", "light_red")}: {full_path}")
                 os.remove(full_path)
 
             parent = full_path.parent
             while parent != self.project_root and len(os.listdir(parent)) == 0:
-                print(f"[D] deleting empty folder: {parent}")
+                print(f"{colored("[D]", "light_red")}: deleting empty folder: {parent}")
                 shutil.rmtree(parent)
                 parent = parent.parent
 
     def move_files(self, files_to_move: set[tuple[Path, Path]]):
         while len(files_to_move) > 0:
             src, dst = files_to_move.pop()
-            print(f"[M] {src} -> {dst}")
+            print(f"{colored("[M]", "yellow")}: {src} -> {dst}")
 
             src = self.project_root / src
             dst = self.project_root / dst
@@ -298,7 +318,7 @@ class CLI:
 
             parent = src.parent
             while parent != self.project_root and len(os.listdir(parent)) == 0:
-                print(f"[M] deleting empty folder: {parent}")
+                print(f"{colored("[M]", "yellow")}: deleting empty folder: {parent}")
                 shutil.rmtree(parent)
                 parent = parent.parent
 
