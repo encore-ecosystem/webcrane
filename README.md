@@ -1,5 +1,5 @@
-# WSVCS
-WebSockets Version Control System
+# White Crane
+Old name is wsvcs (WebSockets Version Control System)
   
 ## Description
 This project resolve the git's restriction about 100mb of commit size. We use the following idea: wsvcs will "chunkify" every file that you want to share with coloborators.    
