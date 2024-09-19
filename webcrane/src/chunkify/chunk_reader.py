@@ -1,4 +1,4 @@
-from wsvcs import PACKAGE_MAX_SIZE
+from webcrane import PACKAGE_MAX_SIZE
 
 
 def read_in_chunks(file_object, path: str = ''):

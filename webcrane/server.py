@@ -1,8 +1,8 @@
 import websockets
 
-from wsvcs.src.chunkify.chunk_reader import split_package_to_chunks
-from wsvcs.src.tui import input_with_default
-from wsvcs.src.packages import *
+from webcrane.src.chunkify.chunk_reader import split_package_to_chunks
+from webcrane.src.tui import input_with_default
+from webcrane.src.packages import *
 
 from websockets import WebSocketServerProtocol
 from websockets.server import serve

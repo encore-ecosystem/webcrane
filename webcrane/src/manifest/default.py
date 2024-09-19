@@ -1,4 +1,4 @@
-from wsvcs.src.tui import input_with_default
+from webcrane.src.tui import input_with_default
 from .manifest import Manifest
 from pathlib import Path
 
@@ -22,7 +22,7 @@ def get_default_manifest(project_root: Path) -> Manifest:
         ),
 
         'ignore': [
-            'wsvcs/.wsvcsignore',
+            'webcrane/.webcraneignore',
         ]
     }, 'sync': {
         'server': input_with_default(

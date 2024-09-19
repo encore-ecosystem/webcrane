@@ -1,4 +1,4 @@
-from wsvcs.src.datastructures import DotIgnore
+from webcrane.src.datastructures import DotIgnore
 from pathlib import Path
 import os
 

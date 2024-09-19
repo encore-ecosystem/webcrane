@@ -4,16 +4,16 @@ from globmatch import glob_match
 
 class DotIgnore:
     def __init__(self):
-        self.patterns = {".wsvcs/*"}
+        self.patterns = set()
 
     def initialize(self, ignore_file_paths: list[Path]) -> 'DotIgnore':
         for ignore_file_path in ignore_file_paths:
             with open(ignore_file_path, "r") as f:
                 for line in f.readlines():
                     # step 1: remove comments
-                    pattern = line.split('#')[0].strip()
+                    pattern_ = line.split('#')[0].strip()
                     # step 2: add to ignore paths
-                    self.patterns.add(pattern)
+                    self.patterns.add(pattern_)
 
         return self
 
