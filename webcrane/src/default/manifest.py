@@ -1,5 +1,5 @@
 from webcrane.src.tui import input_with_default
-from .manifest import Manifest
+from webcrane.src.manifest.cls import Manifest
 from pathlib import Path
 
 

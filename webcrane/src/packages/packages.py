@@ -1,85 +1,112 @@
-def status_ok():
-    return {
-        'type': 'ok',
-    }
+class Package:
+    def __init__(self):
+        self.data = {}
+
+    def __repr__(self):
+        return f"Package: {self.data}"
 
 
-def complete():
-    return {
-        'type': 'complete',
-    }
+class FileChunk(Package):
+    def __init__(self, data: bytes, local_path: str):
+        super().__init__()
+        self.data['data'] = data
+        self.data['local_path'] = local_path
 
 
-def refresh_package():
-    return {
-        'type': 'refresh'
-    }
+class PackageChunk(Package):
+    def __init__(self, package: Package):
+        super().__init__()
+        self.data['package'] = package
 
 
-def subscribers_package(subs: list):
-    return {
-        'type': 'subscribers',
-        'subs': subs
-    }
+class StartSection(Package):
+    pass
 
 
-def role_package(role: str):
-    return {
-        'type': 'role',
-        'role': role
-    }
+class EndSection(Package):
+    pass
 
 
-def room_package(room_name: str):
-    return {
-        'type': 'room',
-        'room': room_name
-    }
+class StartGenerator(Package):
+    pass
 
 
-def rooms_package(rooms: list):
-    return {
-        'type': 'rooms',
-        'rooms': rooms
-    }
+class EndGenerator(Package):
+    pass
 
 
-def sync_package():
-    return {
-        'type': 'sync'
-    }
+class PackageHash(Package):
+    def __init__(self, hash_: str, filepath: str):
+        super().__init__()
+        self.data['hash'] = hash_
+        self.data['filepath'] = filepath
 
 
-def connect_package(room: str):
-    return {
-        'type': 'connect',
-        'room': room
-    }
+class ProjectPackage(Package):
+    def __init__(self, project_name: str):
+        super().__init__()
+        self.data['project_name'] = project_name
 
 
-def data_chunk_package(data, path):
-    return {
-        'type': 'chunk',
-        'path': path,
-        'data': data,
-    }
+class SubscribersPackage(Package):
+    def __init__(self, subs: list[str]):
+        super().__init__()
+        self.data['subs'] = subs
 
 
-def full_data_package(data):
-    return {
-        'type': 'full',
-        'data': data,
-    }
+class MissingFiles(Package):
+    def __init__(self, missing_files: set):
+        super().__init__()
+        self.data['missing_files'] = missing_files
 
 
-def missed_package(packages: list):
-    return {
-        'type': 'to_download',
-        'packages': packages
-    }
+class HashesPackage(Package):
+    def __init__(self, hashes: dict):
+        super().__init__()
+        self.data['hashes'] = hashes
 
 
-def close_package():
-    return {
-        'type': 'close'
-    }
+class CompletePackage(Package):
+    pass
+
+
+class ClosePackage(Package):
+    pass
+
+
+class RefreshPackage(Package):
+    def __init__(self, subs: list):
+        super().__init__()
+        self.data['subs'] = subs
+
+
+class FilePartPackage(Package):
+    def __init__(self, data: bytes, filepath: str):
+        super().__init__()
+        self.data['data'] = data
+        self.data['filepath'] = filepath
+
+
+class PartDataPackage(Package):
+    def __init__(self, data, path):
+        super().__init__()
+        self.data['data'] = data
+        self.data['path'] = path
+
+
+class FullDataPackage(Package):
+    def __init__(self, data):
+        super().__init__()
+        self.data['data'] = data
+
+
+class RolePackage(Package):
+    def __init__(self, role: str):
+        super().__init__()
+        self.data['role'] = role
+
+
+class ChunkPackage(Package):
+    def __init__(self, chunk: bytes):
+        super().__init__()
+        self.data['chunk'] = chunk
