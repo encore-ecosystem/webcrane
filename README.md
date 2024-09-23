@@ -41,6 +41,7 @@ option:
     * New peer logic
     * More info in progress bars
     * Updated algorithms
+    * Threaded grouping files
 
 ## License
 
