@@ -1,4 +1,4 @@
-# White Crane
+# WebCrane
 Old name is wsvcs (WebSockets Version Control System)
   
 ## Description
@@ -12,13 +12,13 @@ This project resolve the git's restriction about 100mb of commit size. We use th
 
 ### Installing
 ```bash
-git clone https://github.com/encore-ecosystem/wsvcs.git
-cd wsvcs
+git clone https://github.com/encore-ecosystem/webcrane.git
+cd webcrane
 pip3 install .
 ```
 ### Executing program
 ```
-wsvcs <option>
+webcrane <option>
 option:
 - init
 - deploy
