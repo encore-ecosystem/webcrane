@@ -48,22 +48,10 @@ class ProjectPackage(Package):
         self.data['project_name'] = project_name
 
 
-class SubscribersPackage(Package):
-    def __init__(self, subs: list[str]):
-        super().__init__()
-        self.data['subs'] = subs
-
-
 class MissingFiles(Package):
     def __init__(self, missing_files: set):
         super().__init__()
         self.data['missing_files'] = missing_files
-
-
-class HashesPackage(Package):
-    def __init__(self, hashes: dict):
-        super().__init__()
-        self.data['hashes'] = hashes
 
 
 class CompletePackage(Package):
@@ -80,33 +68,7 @@ class RefreshPackage(Package):
         self.data['subs'] = subs
 
 
-class FilePartPackage(Package):
-    def __init__(self, data: bytes, filepath: str):
-        super().__init__()
-        self.data['data'] = data
-        self.data['filepath'] = filepath
-
-
-class PartDataPackage(Package):
-    def __init__(self, data, path):
-        super().__init__()
-        self.data['data'] = data
-        self.data['path'] = path
-
-
-class FullDataPackage(Package):
-    def __init__(self, data):
-        super().__init__()
-        self.data['data'] = data
-
-
 class RolePackage(Package):
     def __init__(self, role: str):
         super().__init__()
         self.data['role'] = role
-
-
-class ChunkPackage(Package):
-    def __init__(self, chunk: bytes):
-        super().__init__()
-        self.data['chunk'] = chunk

@@ -5,10 +5,11 @@ from webcrane.src.datastructures import Surjection, DotIgnore
 from termcolor import cprint, colored
 from typing import AsyncIterator, Iterator
 from pathlib import Path
-from webcrane.src.filepath import walktree, hash_file, threaded_hashing
+from webcrane.src.filepath import walktree, threaded_grouping, threaded_hashing
 from websockets.sync.client import connect, ClientConnection
 from websockets import WebSocketServerProtocol
-from webcrane import LENGTH_OF_PATH_IN_PBAR
+from webcrane.src.tui import pretty_pbar
+from webcrane import HASHING_THREADS, GROUPING_THREADS
 
 import shutil
 import pickle
@@ -68,18 +69,22 @@ class Peer:
 
             print("Sending hash of files")
             file_paths = list(walktree(self.project_root, self.get_dotignore()))
-            await self.send_from_generator(websocket, threaded_hashing(self.project_root, file_paths))
+            await self.send_from_generator(websocket, threaded_hashing(
+                self.project_root,
+                file_paths,
+                threads=HASHING_THREADS
+            ))
 
             print("Receiving missing files request")
             missing_files_package = await self.recv(websocket)
             missing_files = missing_files_package.data.get('missing_files', [])
 
             print("Sending missed files")
-            pbar = tqdm.tqdm(missing_files)
-            for filepath in pbar:
-                await self.send_from_generator(websocket, file_generator(self.project_root, filepath, pbar))
+            with tqdm.tqdm(missing_files) as pbar:
+                for filepath in pbar:
+                    await self.send_from_generator(websocket, file_generator(self.project_root, filepath, pbar))
 
-            print("Sending close package")
+            cprint("Complete!", 'green')
             await self.send(websocket, package_chunk_generator(ClosePackage()))
 
     async def pull(self):
@@ -93,12 +98,21 @@ class Peer:
             await self.send(websocket, package_chunk_generator(ProjectPackage(project_name=mfest['project']['name'])))
 
             print("Waiting for hashes")
-            hashes = Surjection()  # todo: hash and group inplace
-            async for hash_package in self.recv_from_generator(websocket):
-                hashes.add_dict_as_key2val({hash_package.data['filepath'] : hash_package.data['hash']})
+            hashes = Surjection()
+            with tqdm.tqdm() as pbar:
+                async for hash_package in self.recv_from_generator(websocket):
+                    pbar.update(1)
+                    pbar.set_description(pretty_pbar(0, hash_package.data['filepath']))
+                    hashes.add_dict_as_key2val({hash_package.data['filepath'] : hash_package.data['hash']})
+            pbar.close()
 
             print("Grouping files")
-            files_to_update, files_to_delete, files_to_move, new_files = self.group_files(hashes)
+            files_to_update, files_to_delete, files_to_move, new_files = threaded_grouping(
+                self.project_root,
+                self.get_dotignore(),
+                hashes,
+                threads=GROUPING_THREADS
+            )
 
             print("Deleting files")
             self.delete_files(files_to_delete)
@@ -112,27 +126,25 @@ class Peer:
             await self.send(websocket, package_chunk_generator(MissingFiles(missed_files)))
 
             print("Receive chunks with missed files")
-            pbar = tqdm.tqdm(missed_files)
-            last_path  = None
-            last_chunk = 0
-            for _ in pbar:
-                async for package in self.recv_from_generator(websocket):
-                    assert isinstance(package, FileChunk)
+            with tqdm.tqdm(missed_files) as pbar:
+                last_path  = None
+                last_chunk = 0
+                for _ in pbar:
+                    async for package in self.recv_from_generator(websocket):
+                        assert isinstance(package, FileChunk)
 
-                    full_path = self.project_root / package.data['local_path']
-                    full_path.parent.mkdir(parents=True, exist_ok=True)
-                    full_path.touch(exist_ok=True)
-                    with open(full_path, 'ab+') as f:
-                        f.write(package.data['data'])
+                        full_path = self.project_root / package.data['local_path']
+                        full_path.parent.mkdir(parents=True, exist_ok=True)
+                        full_path.touch(exist_ok=True)
+                        with open(full_path, 'ab+') as f:
+                            f.write(package.data['data'])
 
-                    last_chunk += 1
-                    if full_path != last_path:
-                        last_path = full_path
-                        last_chunk = 0
+                        last_chunk += 1
+                        if full_path != last_path:
+                            last_path = full_path
+                            last_chunk = 0
 
-                    pbar.set_description(
-                        f"[chunk: {last_chunk:>4}] Working on: {colored('...' + package.data['local_path'][-LENGTH_OF_PATH_IN_PBAR:], "cyan")}"
-                    )
+                        pbar.set_description(pretty_pbar(last_chunk, package.data['local_path']))
 
             cprint("Complete!", 'green')
 
@@ -178,7 +190,6 @@ class Peer:
             pickled_package += chunk
 
         package = pickle.loads(pickled_package)
-        # print(f"[recv] Received package: {package} of type: {type(package)}")
         return package.data['package']
 
     async def recv_from_generator(self, websocket: ClientConnection | WebSocketServerProtocol) -> AsyncIterator[Package]:
@@ -242,41 +253,6 @@ class Peer:
                 print(f"{colored("[M]", "yellow")}: deleting empty folder: {parent}")
                 shutil.rmtree(parent)
                 parent = parent.parent
-
-    def group_files(self, path_hash_sur: Surjection) -> tuple[set, set, set, set]:
-        files_to_update = set()
-        files_to_delete = set()
-        files_to_move   = set()
-        files_to_save   = set()
-
-        for short_path in walktree(self.project_root, dot_ignore=self.get_dotignore()):
-            short_path = str(short_path)
-            long_path = self.project_root / short_path
-            file_hash = hash_file(long_path)
-            # case 1: files at the same directory
-            if short_path in path_hash_sur:
-                if path_hash_sur[short_path] == file_hash:
-                    # same file
-                    files_to_save.add(short_path)
-                else:
-                    # update
-                    print(f"{colored("[U]", "magenta")}: {short_path}")
-                    files_to_update.add(short_path)
-
-            # case 2: same files at the difference folders
-            elif file_hash in path_hash_sur:
-                # move                 <from>         <to>
-                files_to_move.add((short_path, path_hash_sur[file_hash]))
-
-            # case 3: waste file
-            else:
-                # waste
-                files_to_delete.add(short_path)
-
-        # case 4: new files
-        new_files = set(path_hash_sur.from_keys()).difference(files_to_save)
-
-        return files_to_update, files_to_delete, files_to_move, new_files
 
 
 __all__ = ['Peer']

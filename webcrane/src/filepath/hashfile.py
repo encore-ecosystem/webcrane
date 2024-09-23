@@ -1,10 +1,10 @@
 from .chunk_reader import chunk_reader
 from webcrane.src.packages import PackageHash
-from typing import Generator
 import concurrent.futures
 from pathlib import Path
 import hashlib
 import tqdm
+
 
 HASH_SIZE = 8
 

@@ -33,6 +33,7 @@ valid_commands = ['init', 'deploy', 'pull', 'push', 'client', 'run']
 # ======================
 LENGTH_OF_PATH_IN_PBAR = 64
 HASHING_THREADS        = 3
+GROUPING_THREADS       = 3
 #                   mb    bytes
 PACKAGE_MAX_SIZE = 512 * 1024
 

@@ -47,6 +47,7 @@ class RepeaterPeer(Peer):
         project_name = project_package.data['project_name']
 
         print(f"[PUB {addr}]: Creating room")
+        self.rooms.remove_room(room_name=project_name)
         self.rooms.create_room(room_name=project_name)
 
         print(f"[PUB {addr}]: Entering to console")
