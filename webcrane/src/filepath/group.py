@@ -31,7 +31,7 @@ def group_file(root: Path, short_path: Path, path_hash_sur: Surjection) -> tuple
             return GroupType.SAVE, (short_path, )
         else:
             # update
-            print(f"{colored("[U]", "magenta")}: {short_path}")
+            # print(f"{colored("[U]", "magenta")}: {short_path}")
             return GroupType.UPDATE, (short_path, )
 
     # case 2: same files at the difference folders
@@ -64,12 +64,11 @@ def threaded_grouping(root: Path, dotignore: DotIgnore, path_hash_sur: Surjectio
                     case GroupType.MOVE:
                         files_to_move.add(extra)
                     case GroupType.SAVE:
-                        files_to_save.add(extra)
+                        files_to_save.add(extra[0])
 
-        # case 4: new files
-        new_files = set(path_hash_sur.from_keys()).difference(files_to_save)
-
-        return files_to_update, files_to_delete, files_to_move, new_files
+    # case 4: new files
+    new_files = set(path_hash_sur.from_keys()) - files_to_save
+    return files_to_update, files_to_delete, files_to_move, new_files
 
 
 __all__ = [
