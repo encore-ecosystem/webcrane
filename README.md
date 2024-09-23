@@ -30,6 +30,17 @@ option:
 ## Version History
 * 0.1
     * Initial Release
+* 0.2
+    * Add dotignore support (without whitelist)
+    * Boosting working speed
+    * Fixing bugs
+* 0.3
+    * Add colored progress bars
+    * Multithreaded hashing
+* 0.4
+    * New peer logic
+    * More info in progress bars
+    * Updated algorithms
 
 ## License
 
