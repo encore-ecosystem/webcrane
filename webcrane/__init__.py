@@ -32,9 +32,10 @@ valid_commands = ['init', 'deploy', 'pull', 'push', 'client', 'run']
 # Constants
 # ======================
 LENGTH_OF_PATH_IN_PBAR = 64
-HASHING_THREADS        = 4
+HASHING_THREADS        = 3
+GROUPING_THREADS       = 3
 #                   mb    bytes
-PACKAGE_MAX_SIZE = 64 * 1024
+PACKAGE_MAX_SIZE = 512 * 1024
 
 
 #  256 * 1024   - 10.35

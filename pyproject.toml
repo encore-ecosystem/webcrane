@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "wsvcs"
+name = "webcrane"
 version = "0.3.0"
 description = ""
 authors = ["Encore Ecosystem"]
@@ -20,4 +20,4 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-wsvcs = "wsvcs.main:main"
+webcrane = "webcrane.main:main"
