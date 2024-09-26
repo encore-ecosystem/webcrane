@@ -84,7 +84,6 @@ class Peer:
                 for filepath in pbar:
                     await self.send_from_generator(websocket, file_generator(self.project_root, filepath, pbar))
 
-            await self.send(websocket, package_chunk_generator(ClosePackage()))
             cprint("Complete!", 'green')
 
     async def pull(self):

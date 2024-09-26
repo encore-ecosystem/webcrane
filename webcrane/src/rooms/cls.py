@@ -1,4 +1,12 @@
+from collections import deque
 import websockets
+from enum import Enum
+
+
+class SendType(str, Enum):
+    PACKAGE = 'pack'
+    GENERATOR = 'gen'
+    CLOSE = 'close'
 
 
 class Rooms:
@@ -7,6 +15,7 @@ class Rooms:
 
         self.locked   = set()
         self.statuses = {}
+        self.buffer   = {}
 
     def get_num_of_subs(self, room_name: str) -> int:
         return len(self.rooms.get(room_name, []))
@@ -15,6 +24,7 @@ class Rooms:
         if room_name not in self.rooms:
             self.rooms[room_name] = []
             self.statuses[room_name] = 0
+            self.buffer[room_name] = deque()
 
     def lock(self, room_name: str):
         self.locked.add(room_name)
@@ -45,10 +55,19 @@ class Rooms:
         self.create_room(room_name)
         if room_name not in self.locked:
             self.rooms[room_name].append(
-                {'address': sub_address, 'websocket': sub_websocket, 'missing_files': set()}
+                {
+                    'address': sub_address,
+                    'websocket': sub_websocket,
+                    'missing_files': set(),
+                }
             )
             return True
         return False
+
+    def add_send_request(self, room_name: str, send_type: SendType, generator):
+        if room_name not in self.buffer:
+            self.buffer[room_name] = deque()
+        self.buffer[room_name].append([send_type, generator, len(self.rooms[room_name])])
 
     def add_missed_files(self, room_name: str, sub_address: str, missed_files: set):
         sub_index = 0
@@ -63,18 +82,19 @@ class Rooms:
         while sub_index < len(self.rooms.get(room_name, [])):
             if self.rooms[room_name][sub_index]['address'] == sub_address:
                 popped = self.rooms[room_name].pop()
-                if sub_index + 1 != len(self.rooms[room_name]):
+                if sub_index != len(self.rooms[room_name]):
                     self.rooms[room_name][sub_index] = popped
                 break
             sub_index += 1
 
         # Clear room if there are no subs in room
-        self.remove_room(room_name)
+        if len(self.rooms[room_name]) == 0:
+            self.remove_room(room_name)
 
     def remove_room(self, room_name: str):
         if room_name in self.rooms:
             self.unlock(room_name)
-            del self.rooms[room_name], self.statuses[room_name]
+            del self.rooms[room_name], self.statuses[room_name], self.buffer[room_name]
 
     def increment_status(self, room_name: str):
         self.statuses[room_name] += 1
@@ -83,4 +103,4 @@ class Rooms:
         return self.statuses.get(room_name, 0)
 
 
-__all__ = ['Rooms']
+__all__ = ['Rooms', 'SendType']

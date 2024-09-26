@@ -1,12 +1,10 @@
 import asyncio
-import pickle
-from typing import AsyncIterator
-
 import websockets
 
+from collections import deque
 from webcrane.peers.peer import Peer
 from webcrane.src.packages import *
-from webcrane.src.rooms import Rooms
+from webcrane.src.rooms import *
 from webcrane.src.tui import input_with_default
 
 
@@ -65,6 +63,7 @@ class RepeaterPeer(Peer):
 
         print(f"[PUB {addr}]: Transmitting hashes")
         await self.shared_send_from_generator(project_name, self.recv_from_generator(websocket))
+        self.rooms.add_send_request(project_name, SendType.CLOSE, [])
 
         print(f"[PUB {addr}]: Waiting to receive all missed packages")
         while self.rooms.get_status(project_name) != self.rooms.get_num_of_subs(project_name):
@@ -75,18 +74,19 @@ class RepeaterPeer(Peer):
         for miss in self.rooms.get_missing_files(room_name=project_name):
             missing_files |= miss
         await self.send(websocket, package_chunk_generator(MissingFiles(missing_files)))
+        # self.rooms.add_send_request(project_name, SendType.CLOSE, [])
 
         print(f"[PUB {addr}]: Transmit chunks")
         for _ in range(len(missing_files)):
             await self.shared_send_from_generator(project_name, self.recv_from_generator(websocket))
 
-        print(f"[PUB {addr}]: Close connections")
-        for sub in self.rooms.get_subs(room_name=project_name):
-            await self.send(sub['websocket'], package_chunk_generator(ClosePackage()))
-            await sub['websocket'].close()
+        self.rooms.add_send_request(project_name, SendType.CLOSE, [])
 
-        print("Complete")
-        self.rooms.remove_room(room_name=project_name)
+        while project_name in self.rooms.rooms:
+            await asyncio.sleep(0.05)
+
+        await websocket.close()
+        print(f"[PUB {addr}]: Closed")
 
     async def handle_pull(self, websocket: websockets.WebSocketServerProtocol):
         addr = websocket.remote_address[:2]
@@ -97,35 +97,64 @@ class RepeaterPeer(Peer):
 
         print(f"[SUB {addr}]: Waiting for pusher")
         while project_name not in self.rooms.rooms:
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.05)
 
         print(f"[SUB {addr}]: Append user")
         self.rooms.add_sub(room_name=project_name, sub_address=addr, sub_websocket=websocket)
 
-        print(f"[SUB {addr}]: Receiving missing packages")
+        print(f"[SUB {addr}]: Transmitting hashes")
+        buffer: deque = self.rooms.buffer[project_name]
+        while True:
+            while len(buffer) == 0:
+                await asyncio.sleep(0.05)
+            buffer[0][2] -= 1
+            if buffer[0][2] == 0:
+                sending_request = buffer.popleft()
+            else:
+                sending_request = buffer[0]
+            send_type: SendType = sending_request[0]
+            match send_type:
+                case SendType.CLOSE:
+                    break
+                case SendType.PACKAGE:
+                    await self.send(websocket, sending_request[1])
+                case SendType.GENERATOR:
+                    await self.send_from_generator(websocket, sending_request[1])
+
+        print(f"[SUB {addr}]: Receiving missed")
         missing_file_package = await self.recv(websocket)
         missing_files = missing_file_package.data['missing_files']
 
         self.rooms.increment_status(room_name=project_name)
         self.rooms.add_missed_files(room_name=project_name, sub_address=addr, missed_files=missing_files)
 
-        print("[SUB]: Waiting to complete sending")
-        while self.rooms.rooms.get(project_name, None) is not None:
-            await asyncio.sleep(0.5)
+        print(f"[SUB {addr}]: Transmitting chunks")
+        while True:
+            while len(buffer) == 0:
+                await asyncio.sleep(0.05)
+            buffer[0][2] -= 1
+            if buffer[0][2] == 0:
+                sending_request = buffer.popleft()
+            else:
+                sending_request = buffer[0]
+            send_type: SendType = sending_request[0]
+            match send_type:
+                case SendType.CLOSE:
+                    break
+                case SendType.PACKAGE:
+                    await self.send(websocket, sending_request[1])
+                case SendType.GENERATOR:
+                    await self.send_from_generator(websocket, sending_request[1])
+
+        print(f"[SUB {addr}]: Close connection")
+        await websocket.close()
+        self.rooms.remove_sub(room_name=project_name, sub_address=addr)
 
     async def shared_send(self, room: str, chunk_generator):
-        await asyncio.gather(
-            *[
-                self.send(sub_ws, chunk_generator) for sub_ws in self.rooms.get_websockets(room_name=room)
-            ]
-        )
+        self.rooms.add_send_request(room_name=room, send_type=SendType.PACKAGE, generator=chunk_generator)
 
     async def shared_send_from_generator(self, room: str, generator):
-        await asyncio.gather(
-            *[
-                self.send_from_generator(sub_ws, generator) for sub_ws in self.rooms.get_websockets(room_name=room)
-            ]
-        )
+        self.rooms.add_send_request(room_name=room, send_type=SendType.GENERATOR, generator=generator)
 
 
 __all__ = ['RepeaterPeer']
